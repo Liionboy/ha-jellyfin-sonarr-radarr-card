@@ -41,15 +41,29 @@ type: module
 type: custom:ha-media-hub-card
 title: Media Hub
 show_raw_attributes: true
+jellyfin:
+  - sensor.jellyhome_active_clients
+sonarr:
+  - sensor.sonarr_shows
+  - sensor.sonarr_queue
+  - sensor.sonarr_upcoming
+  - sensor.sonarr_wanted
+radarr:
+  - sensor.radarr_movies
+  - sensor.radarr_queue
+```
+
+Flat entity lists are also supported. The card will group known Jellyfin, Sonarr, and Radarr entities automatically:
+
+```yaml
+type: custom:ha-media-hub-card
+title: Media Hub
 entities:
-  jellyfin:
-    - media_player.jellyfin
-  sonarr:
-    - sensor.sonarr_queue
-    - sensor.sonarr_upcoming
-  radarr:
-    - sensor.radarr_queue
-    - sensor.radarr_upcoming
+  - sensor.jellyhome_active_clients
+  - sensor.sonarr_shows
+  - sensor.sonarr_queue
+  - sensor.radarr_movies
+  - sensor.radarr_queue
 ```
 
 ## Configuration
@@ -58,8 +72,12 @@ entities:
 |---|---|---|
 | `title` | string | Card title |
 | `show_raw_attributes` | boolean | Show the raw entity payload |
-| `entities` | object | Groups of entity IDs by service |
+| `entities` | array or object | Flat entity list, or grouped entity IDs |
+| `jellyfin` | array | Jellyfin entity IDs |
+| `sonarr` | array | Sonarr entity IDs |
+| `radarr` | array | Radarr entity IDs |
 | `attr_keys` | array | Which attributes to surface in the compact view |
+| `max_attributes` | number | Maximum attributes shown per entity |
 
 ## Development
 

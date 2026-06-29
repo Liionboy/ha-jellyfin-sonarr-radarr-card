@@ -10,6 +10,16 @@ const DEFAULT_ATTR_KEYS = [
   'message', 'error',
 ];
 
+const TECHNICAL_ATTR_KEYS = new Set([
+  'device_class',
+  'entity_picture',
+  'friendly_name',
+  'icon',
+  'restored',
+  'state_class',
+  'supported_features',
+]);
+
 const LABEL_MAP = {
   friendly_name: 'Name',
   title: 'Title',
@@ -45,7 +55,11 @@ class HaMediaHubCard extends HTMLElement {
       show_raw_attributes: Boolean(config.show_raw_attributes),
       entities: config.entities ?? [],
       groups: config.groups ?? null,
-      attr_keys: Array.isArray(config.attr_keys) ? config.attr_keys : DEFAULT_ATTR_KEYS,
+      jellyfin: config.jellyfin ?? null,
+      sonarr: config.sonarr ?? null,
+      radarr: config.radarr ?? null,
+      attr_keys: Array.isArray(config.attr_keys) ? config.attr_keys : null,
+      max_attributes: Number.isInteger(config.max_attributes) ? config.max_attributes : 12,
     };
     this.render();
   }
@@ -118,9 +132,15 @@ class HaMediaHubCard extends HTMLElement {
   }
 
   normalizeGroups() {
+    const directGroups = {};
+    for (const key of ['jellyfin', 'sonarr', 'radarr']) {
+      if (Array.isArray(this._config[key])) directGroups[key] = this._config[key];
+    }
+    if (Object.keys(directGroups).length > 0) return Object.entries(directGroups);
+
     if (this._config.groups && typeof this._config.groups === 'object') {
       return Object.entries(this._config.groups)
-        .map(([key, value]) => [key, Array.isArray(value) ? value : []]);
+        .map(([key, value]) => [key, this.normalizeEntityList(value)]);
     }
 
     const entities = this._config.entities;
@@ -137,9 +157,15 @@ class HaMediaHubCard extends HTMLElement {
     }
 
     if (entities && typeof entities === 'object') {
-      return Object.entries(entities).map(([key, value]) => [key, Array.isArray(value) ? value : []]);
+      return Object.entries(entities).map(([key, value]) => [key, this.normalizeEntityList(value)]);
     }
 
+    return [];
+  }
+
+  normalizeEntityList(value) {
+    if (Array.isArray(value)) return value;
+    if (value && Array.isArray(value.entities)) return value.entities;
     return [];
   }
 
@@ -159,11 +185,8 @@ class HaMediaHubCard extends HTMLElement {
 
     const state = entity.state ?? 'unknown';
     const friendly = entity.attributes?.friendly_name ?? entityId;
-    const attrPairs = this._config.attr_keys
-      .filter((key) => entity.attributes?.[key] !== undefined && entity.attributes?.[key] !== null && entity.attributes?.[key] !== '')
-      .slice(0, 5)
-      .map((key) => {
-        const value = entity.attributes?.[key];
+    const attrPairs = this.getDisplayAttributes(entity)
+      .map(([key, value]) => {
         const display = typeof value === 'object' ? JSON.stringify(value) : String(value);
         return `<div><strong>${this.escapeHtml(LABEL_MAP[key] ?? key)}</strong>: ${this.escapeHtml(display)}</div>`;
       })
@@ -181,6 +204,18 @@ class HaMediaHubCard extends HTMLElement {
         <div class="state">${this.escapeHtml(state)}</div>
       </div>
     `;
+  }
+
+  getDisplayAttributes(entity) {
+    const attrs = entity.attributes || {};
+    const keys = this._config.attr_keys || Object.keys(attrs)
+      .filter((key) => !TECHNICAL_ATTR_KEYS.has(key))
+      .filter((key) => attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== '');
+
+    return keys
+      .filter((key) => attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== '')
+      .slice(0, this._config.max_attributes)
+      .map((key) => [key, attrs[key]]);
   }
 
   buildExtraHints(entity) {
