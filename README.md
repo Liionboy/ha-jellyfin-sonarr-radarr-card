@@ -51,7 +51,10 @@ sonarr:
 radarr:
   - sensor.radarr_movies
   - sensor.radarr_queue
+  - sensor.recently_added_movies
 ```
+
+The card can only show titles that exist in entity attributes. For example, many Radarr sensors expose only a total movie count, while sensors like `sensor.recently_added_movies` expose a `data` list with real movie titles.
 
 Flat entity lists are also supported. The card will group known Jellyfin, Sonarr, and Radarr entities automatically:
 

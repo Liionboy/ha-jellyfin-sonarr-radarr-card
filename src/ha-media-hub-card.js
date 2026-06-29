@@ -38,6 +38,7 @@ const LABEL_MAP = {
   error: 'Error',
   unit_of_measurement: 'Unit',
   device_class: 'Class',
+  data: 'Items',
 };
 
 class HaMediaHubCard extends HTMLElement {
@@ -116,6 +117,8 @@ class HaMediaHubCard extends HTMLElement {
         .meta { color: var(--secondary-text-color, #6d6d6d); font-size:.85rem; margin-top:2px; }
         .attrs { display:grid; gap:2px; margin-top:6px; color: var(--primary-text-color, #1f1f1f); font-size:.84rem; }
         .attrs strong { font-weight:600; }
+        .attrs ul { margin:4px 0 0; padding-left:18px; display:grid; gap:3px; }
+        .attrs li { line-height:1.35; }
         .state { font-size:.8rem; color:white; background: var(--primary-color, #03a9f4); padding:4px 8px; border-radius:999px; white-space:nowrap; }
         .empty { color: var(--secondary-text-color, #6d6d6d); font-size:.9rem; }
         pre { margin:12px 0 0; padding:12px; border-radius:12px; background: rgba(127,127,127,.08); overflow:auto; font-size:.8rem; }
@@ -185,12 +188,7 @@ class HaMediaHubCard extends HTMLElement {
 
     const state = entity.state ?? 'unknown';
     const friendly = entity.attributes?.friendly_name ?? entityId;
-    const attrPairs = this.getDisplayAttributes(entity)
-      .map(([key, value]) => {
-        const display = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        return `<div><strong>${this.escapeHtml(LABEL_MAP[key] ?? key)}</strong>: ${this.escapeHtml(display)}</div>`;
-      })
-      .join('');
+    const attrPairs = this.renderDisplayAttributes(entity);
     const extraHints = this.buildExtraHints(entity);
 
     return `
@@ -216,6 +214,57 @@ class HaMediaHubCard extends HTMLElement {
       .filter((key) => attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== '')
       .slice(0, this._config.max_attributes)
       .map((key) => [key, attrs[key]]);
+  }
+
+  renderDisplayAttributes(entity) {
+    return this.getDisplayAttributes(entity)
+      .map(([key, value]) => this.renderAttributeValue(key, value))
+      .join('');
+  }
+
+  renderAttributeValue(key, value) {
+    const label = this.escapeHtml(LABEL_MAP[key] ?? key);
+
+    if (Array.isArray(value)) {
+      const items = value
+        .map((item) => this.formatListItem(item))
+        .filter(Boolean)
+        .slice(0, this._config.max_attributes);
+
+      if (items.length === 0) return '';
+      return `
+        <div class="attr-block">
+          <strong>${label}</strong>
+          <ul>${items.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>
+        </div>
+      `;
+    }
+
+    if (value && typeof value === 'object') {
+      const display = this.formatListItem(value);
+      return `<div><strong>${label}</strong>: ${this.escapeHtml(display)}</div>`;
+    }
+
+    return `<div><strong>${label}</strong>: ${this.escapeHtml(String(value))}</div>`;
+  }
+
+  formatListItem(item) {
+    if (item === null || item === undefined || item === '') return '';
+    if (typeof item !== 'object') return String(item);
+
+    const title = item.title || item.name || item.seriesTitle || item.movieTitle || item.label || item.summary;
+    const episode = item.episode || item.episodeTitle || item.seasonEpisode;
+    const status = item.status || item.quality || item.release || item.airdate || item.aired;
+    const details = [episode, status].filter(Boolean).join(' - ');
+
+    if (title && details) return `${title} (${details})`;
+    if (title) return String(title);
+
+    return Object.entries(item)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .slice(0, 4)
+      .map(([field, value]) => `${field}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`)
+      .join(', ');
   }
 
   buildExtraHints(entity) {
