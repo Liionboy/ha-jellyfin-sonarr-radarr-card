@@ -43,7 +43,8 @@ class HaMediaHubCard extends HTMLElement {
     this._config = {
       title: config.title ?? 'Media Hub',
       show_raw_attributes: Boolean(config.show_raw_attributes),
-      entities: config.entities ?? {},
+      entities: config.entities ?? [],
+      groups: config.groups ?? null,
       attr_keys: Array.isArray(config.attr_keys) ? config.attr_keys : DEFAULT_ATTR_KEYS,
     };
     this.render();
@@ -65,8 +66,7 @@ class HaMediaHubCard extends HTMLElement {
       return;
     }
 
-    const entities = this._config.entities || {};
-    const groupEntries = Array.isArray(entities) ? [['default', entities]] : Object.entries(entities);
+    const groupEntries = this.normalizeGroups();
 
     const cards = groupEntries.map(([groupKey, entityIds]) => {
       const items = (entityIds || []).map((entityId) => this.renderEntityRow(entityId)).join('');
@@ -115,6 +115,32 @@ class HaMediaHubCard extends HTMLElement {
         ${rawAttributes}
       </ha-card>
     `;
+  }
+
+  normalizeGroups() {
+    if (this._config.groups && typeof this._config.groups === 'object') {
+      return Object.entries(this._config.groups)
+        .map(([key, value]) => [key, Array.isArray(value) ? value : []]);
+    }
+
+    const entities = this._config.entities;
+    if (Array.isArray(entities)) {
+      const buckets = { jellyfin: [], sonarr: [], radarr: [], other: [] };
+      for (const entityId of entities) {
+        if (typeof entityId !== 'string') continue;
+        if (entityId.startsWith('sensor.jelly') || entityId.startsWith('media_player.jelly')) buckets.jellyfin.push(entityId);
+        else if (entityId.startsWith('sensor.sonarr') || entityId.startsWith('binary_sensor.sonarr')) buckets.sonarr.push(entityId);
+        else if (entityId.startsWith('sensor.radarr') || entityId.startsWith('binary_sensor.radarr')) buckets.radarr.push(entityId);
+        else buckets.other.push(entityId);
+      }
+      return Object.entries(buckets).filter(([, value]) => value.length > 0);
+    }
+
+    if (entities && typeof entities === 'object') {
+      return Object.entries(entities).map(([key, value]) => [key, Array.isArray(value) ? value : []]);
+    }
+
+    return [];
   }
 
   renderEntityRow(entityId) {
