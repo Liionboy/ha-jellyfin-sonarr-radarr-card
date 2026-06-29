@@ -10,6 +10,26 @@ const DEFAULT_ATTR_KEYS = [
   'message', 'error',
 ];
 
+const LABEL_MAP = {
+  friendly_name: 'Name',
+  title: 'Title',
+  status: 'Status',
+  state: 'State',
+  queue: 'Queue',
+  queue_size: 'Queue size',
+  upcoming: 'Upcoming',
+  next_episode: 'Next episode',
+  next_movie: 'Next movie',
+  last_synced: 'Last synced',
+  last_scan: 'Last scan',
+  library: 'Library',
+  progress: 'Progress',
+  message: 'Message',
+  error: 'Error',
+  unit_of_measurement: 'Unit',
+  device_class: 'Class',
+};
+
 class HaMediaHubCard extends HTMLElement {
   constructor() {
     super();
@@ -80,6 +100,8 @@ class HaMediaHubCard extends HTMLElement {
         .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 12px; border-radius:12px; background: rgba(127,127,127,.06); }
         .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .meta { color: var(--secondary-text-color, #6d6d6d); font-size:.85rem; margin-top:2px; }
+        .attrs { display:grid; gap:2px; margin-top:6px; color: var(--primary-text-color, #1f1f1f); font-size:.84rem; }
+        .attrs strong { font-weight:600; }
         .state { font-size:.8rem; color:white; background: var(--primary-color, #03a9f4); padding:4px 8px; border-radius:999px; white-space:nowrap; }
         .empty { color: var(--secondary-text-color, #6d6d6d); font-size:.9rem; }
         pre { margin:12px 0 0; padding:12px; border-radius:12px; background: rgba(127,127,127,.08); overflow:auto; font-size:.8rem; }
@@ -111,22 +133,38 @@ class HaMediaHubCard extends HTMLElement {
 
     const state = entity.state ?? 'unknown';
     const friendly = entity.attributes?.friendly_name ?? entityId;
-    const attrLine = this._config.attr_keys
-      .map((key) => entity.attributes?.[key])
-      .filter((value) => value !== undefined && value !== null && value !== '')
-      .slice(0, 4)
-      .map((value) => typeof value === 'object' ? JSON.stringify(value) : String(value))
-      .join(' • ');
+    const attrPairs = this._config.attr_keys
+      .filter((key) => entity.attributes?.[key] !== undefined && entity.attributes?.[key] !== null && entity.attributes?.[key] !== '')
+      .slice(0, 5)
+      .map((key) => {
+        const value = entity.attributes?.[key];
+        const display = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        return `<div><strong>${this.escapeHtml(LABEL_MAP[key] ?? key)}</strong>: ${this.escapeHtml(display)}</div>`;
+      })
+      .join('');
+    const extraHints = this.buildExtraHints(entity);
 
     return `
       <div class="row">
         <div>
           <div class="name">${this.escapeHtml(friendly)}</div>
-          <div class="meta">${this.escapeHtml(entityId)}${attrLine ? ` · ${this.escapeHtml(attrLine)}` : ''}</div>
+          <div class="meta">${this.escapeHtml(entityId)}</div>
+          ${attrPairs ? `<div class="attrs">${attrPairs}</div>` : ''}
+          ${extraHints ? `<div class="meta">${this.escapeHtml(extraHints)}</div>` : ''}
         </div>
         <div class="state">${this.escapeHtml(state)}</div>
       </div>
     `;
+  }
+
+  buildExtraHints(entity) {
+    const hints = [];
+    const attrs = entity.attributes || {};
+    if (attrs.unit_of_measurement) hints.push(String(attrs.unit_of_measurement));
+    if (entity.state && entity.state !== 'unknown' && entity.state !== 'unavailable') {
+      hints.push(`state ${entity.state}`);
+    }
+    return hints.join(' • ');
   }
 
   renderRawAttributes(groupEntries) {
